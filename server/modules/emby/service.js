@@ -2365,6 +2365,18 @@ async function getEpisodes(showId, seasonId) {
 
   const items = (look.item.episodes || [])
     .filter((e) => Number.isFinite(e.episodeNumber))
+    /* 未播出的集不列：
+     *   ① premiereDate 晚于现在 → 丢掉（客户端点开是空壳）
+     *   ② 末尾没有 premiereDate 的占位集（TMDB 会给未播集建空条目）→ 丢掉
+     * 整季都没有日期时按 ① 无从判断，就原样保留。 */
+    .filter((e, _i, arr) => {
+      const t = Date.parse(e.premiereDate || '');
+      if (Number.isFinite(t)) return t <= Date.now();
+      const dated = arr.filter((x) => Number.isFinite(Date.parse(x.premiereDate || '')));
+      if (!dated.length) return true;
+      const lastDated = Math.max(...dated.map((x) => x.episodeNumber));
+      return e.episodeNumber <= lastDated;
+    })
     .map((e) => {
       const item = baseItem({
         id: metaBridge.itemId(show.domain, 'tv', show.entryId, n, e.episodeNumber),
